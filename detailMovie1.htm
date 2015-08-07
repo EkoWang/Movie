@@ -1,0 +1,972 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="page-view-size" content="1280*720"/>
+<title>三级页面-电影</title>
+<script type="text/javascript" src="common2.js"></script>
+<script language="javascript">
+var menuType = 0; //0:最新大片、1:热播影院、2:华语专区、3:海外专区
+var menuTitles = ["强档推荐","票房风云","顶尖特效","经典大片","电影片库","片花集锦","即将下线"];
+var assetId = "";
+var detailAjaxObj = null;
+var movieObj = null;
+var msgTimeout = -1;
+var serviceId = "";
+var chargeMode = "";
+var listArea = "";
+var listCurrPage = "";
+var listDataPos = "";
+var tipShowFlag = false;
+var resumeTipsFlag = false;
+var resumeTipsPos = 0;
+var choiceResumeFlag = false;
+var timePosition = 0;
+var moreInfoShowFlag = false;
+var moreInfoPos = 0;
+var moreInfoTimeout = -1;
+var tipProg=null;//公告数据
+var tipAjaxObj=null;
+var backtype= "";
+
+document.onkeypress = grdEvent;
+document.onirkeypress = grdEvent;
+document.onsystemevent = grdEvent;
+
+function grdEvent(event){
+	var keycode = event.which;
+	Utility.println("detailMovie grdEvent keycode="+keycode);
+	switch(keycode){
+		case 3:								// left
+		case 37:
+			if(resumeTipsFlag) changeResumeTipsPos();
+			else if(moreInfoShowFlag) chageMoreInfoPos(-1);
+			return 0;
+			break;
+		case 4:								// right
+		case 39:
+			if(resumeTipsFlag) changeResumeTipsPos();
+			else if(moreInfoShowFlag) chageMoreInfoPos(1);
+			return 0;
+			break;
+		case 4097:
+		case 13:							// select
+			if(tipShowFlag) return 0;
+			doSelect();
+			return 0;
+			break;
+		case 340:							// back
+		case 8:								// back
+			backurl();
+			return 0;
+			break;
+		case 339:							// exit
+		case 27:							// exit
+		case 512:
+		case 513:
+		case 4098:							// menu
+//			gotoIndex();
+			return 1;
+			break;
+		case 835:							//blue
+			if(tipShowFlag || resumeTipsFlag) return 0;
+			if(moreInfoShowFlag) hideMoreInfo();
+			else showMoreInfo();
+			return 0;
+			break;
+		case 514://信息键响应搜索
+            window.location.href = "http://vod.fjgdwl.com:80/SearchNew/search_2.htm";
+//			window.location.href = "searchInput.htm?assetId=" + menuAssetIdsMovie[menuType] + "&backUrl=listMovie.htm?type="+menuType+"&listArea=" + listArea + "&listCurrPage=" + listCurrPage + "&listDataPos=" + listDataPos;
+			return 0;
+			break;
+	}
+}
+
+function init(){
+	menuType = parseInt(getUrlParams("type", window.location.href));
+	assetId = getUrlParams("assetId", window.location.href);
+	serviceId = getUrlParams("serviceId", window.location.href);
+	chargeMode = getUrlParams("chargeMode", window.location.href);
+	listArea = getUrlParams("listArea", window.location.href);
+	listCurrPage = getUrlParams("listCurrPage", window.location.href);
+	listDataPos = getUrlParams("listDataPos", window.location.href);
+	backtype = getUrlParams("backtype", window.location.href);
+	$("title").innerText = "互动点播 >电影 >" + menuTitles[backtype];
+	showDateTime();
+	getDetailData();
+	getTipProgData();
+}
+
+//获取公告信息
+function getTipProgData(){
+	if (tipAjaxObj == null) {
+		tipAjaxObj = new ajaxClass();
+		tipAjaxObj.frame = window;
+	} else {
+		tipAjaxObj.requestAbort();
+	}
+	$("loadingIcon").style.visibility="visible" ;
+//	$("topProgArea").style.visibility = "hidden";
+	tipAjaxObj.successCallback = function(_xmlHttp, _params) {
+		iPanel.debug("getTipProgData getTopProgData request success!");
+		iPanel.debug("getTipProgData getTopProgData _xmlHttp.responseText="+_xmlHttp.responseText);
+		var data = parseDom(this.getResponseXML());
+		var jsonData = parseJson(data.toJson());
+		if(typeof (jsonData)!= "object" || jsonData == null){
+			iPanel.debug("getTipProgData getTopProgData error! error_code="+jsonData.error_code);
+			$("popText").innerText = "获取公告数据失败！";
+			$("popMsg").style.visibility = "visible";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("loadingIcon").style.visibility="hidden" ;
+			return;
+		}
+		var key = "FolderContents";
+		iPanel.debug("getTipProgData getTopProgData key in jsondata="+(key in jsonData));
+		if(key in jsonData){
+			var totalResult = parseInt(jsonData.FolderContents[0].totalResults,10);
+			topServiceId = jsonData.FolderContents[0].FolderFrame[0].serviceId;
+			topChargeMode = jsonData.FolderContents[0].FolderFrame[0].chargeMode;
+			iPanel.debug("getTipProgData getTopProgData totalResult="+totalResult+"&&topServiceId="+topServiceId+"&&topChargeMode="+topChargeMode);	
+			if(totalResult > 0){
+				//理论上来说应该没有电影返回，可以不用考虑。
+//				var series = jsonData.FolderContents[0].ChildFolder;
+				tipProg = jsonData.FolderContents[0].SelectableItem;
+				//添加一个属性标识是电视剧还是电影
+//				if(typeof series != "undefined"){
+//					topProg = series[0];
+//					topProg.type = "S";
+//				}
+//				else{
+//					topProg = movies[0];
+//					topProg.type = "M";
+//				}
+				initTipPrograms();
+				$("popMsg").style.visibility = "hidden";
+//				$("topProgArea").style.visibility = "visible";
+			}
+			else{
+				$("popText").innerText = "暂无数据";
+				$("popMsg").style.visibility = "visible";
+				msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+				$("loadingIcon").style.visibility="hidden" ;
+			}
+		}else if("NavServerResponse" in jsonData){
+			var message = jsonData.NavServerResponse[0].message;
+			var code = jsonData.NavServerResponse[0].code;
+			iPanel.debug("listSerie getTopProgData error! message="+message+";code="+code);
+			$("popText").innerText = "发生错误！错误码："+code+"，请咨询客服96311。";
+			$("popMsg").style.visibility = "visible";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("loadingIcon").style.visibility="hidden" ;
+		}else{
+			iPanel.debug("getTipProgData getTopProgData FolderContents is not in jsondata");
+			$("popText").innerText = "获取数据失败！";
+			$("popMsg").style.visibility = "visible";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("loadingIcon").style.visibility="hidden" ;
+		}	
+	};
+	tipAjaxObj.failureCallback = function(_xmlHttp, _params) {
+		iPanel.debug("listSerie getTopProgData request failed");
+		$("popText").innerText = "获取数据失败！";
+		$("popMsg").style.visibility = "visible";
+		msgTimeout = setTimeout('$("topTips").style.visibility = "hidden";tipShowFlag = false;',3000);
+		$("loadingIcon").style.visibility="hidden" ;
+	};
+	tipAjaxObj.urlParameters = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?><GetFolderContents assetId='"+tipAssetId1+"' portalId='1' client='"+CAManager.cardSerialNumber+"' account='"+account+"' startAt='1' maxItems='1' languageCode='Zh-CN' regionCode='1' includeFolderProperties='Y' includeSubFolder='Y' includeSelectableItem='Y' profile='1.0'/>";
+	tipAjaxObj.url = ["http://"+ip+":"+port+"/GetFolderContents","data/topProgData_"+menuType+"_1.xml"][DEBUG];
+	tipAjaxObj.requestData("POST");
+	iPanel.debug("listSerie getTopProgData urlParameters="+tipAjaxObj.urlParameters);
+	iPanel.debug("listSerie getTopProgData url="+tipAjaxObj.url);
+}
+
+function initTipPrograms(){
+	var name = tipProg[0].titleFull;
+	iPanel.debug("cartoon initTipPrograms name=="+name);
+	if(getStrChineseLength(name) > 0){
+		$("tipProgSummar").innerHTML ="<marquee height='36' >" + name + "</marquee>";
+	}	
+}
+
+function showDateTime(){
+	var dateTime = util.date.format(new Date(),"yyyy-MM-dd hh:mm");
+	$("dateTime").innerText = dateTime;
+	setTimeout("showDateTime()",60000);
+}
+
+/*获取节目数据， 接口：GetItemData*/
+function getDetailData(){
+	if (detailAjaxObj == null) {
+		detailAjaxObj = new ajaxClass();
+		detailAjaxObj.frame = window;
+	} else {
+		detailAjaxObj.requestAbort();
+	}
+	//$("tips").innerText = "正在请求数据，请稍等！";
+	//$("tips").style.visibility = "visible";
+	$("loadingIcon").style.visibility = "visible";
+	detailAjaxObj.successCallback = function(_xmlHttp, _params) {
+		Utility.println("detailMovie getDetailData request success!");
+		Utility.println("detailMovie getDetailData _xmlHttp.responseText="+_xmlHttp.responseText);
+		var data = parseDom(this.getResponseXML());
+		var jsonData = parseJson(data.toJson());
+		if(typeof (jsonData)!= "object" || jsonData == null){
+			Utility.println("detailMovie getDetailData error! error_code="+jsonData.error_code);
+			$("tips").innerText = "获取数据失败！";
+			$("tips").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+			return;
+		}
+		var key = "ItemData";
+		Utility.println("detailMovie getDetailData key in jsondata="+(key in jsonData));
+		if(key in jsonData){
+			movieObj = jsonData.ItemData[0].SelectableItem[0];
+			initDetailInfo();
+			$("tips").style.visibility = "hidden";
+			$("playBtn").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+		}else if("NavServerResponse" in jsonData){
+			var message = jsonData.NavServerResponse[0].message;
+			var code = jsonData.NavServerResponse[0].code;
+			Utility.println("detailMovie getDetailData error! message="+message+";code="+code);
+			$("tips").innerText = "发生错误！错误码："+code+"，请咨询客服96311。";
+			$("tips").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+		}else{
+			Utility.println("detailMovie getDetailData FolderContents is not in jsondata");
+			$("tips").innerText = "获取数据失败！";
+			$("tips").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+		}	
+	};
+	detailAjaxObj.failureCallback = function(_xmlHttp, _params) {
+		Utility.println("detailMovie getDetailData request failed");
+		$("tips").innerText = "获取数据失败！";
+		$("tips").style.visibility = "visible";
+		$("loadingIcon").style.visibility = "hidden";
+	};
+	detailAjaxObj.urlParameters = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?><GetItemData titleAssetId='" + assetId + "' portalId='1' client='" + CAManager.cardSerialNumber + "' account='" + account + "' languageCode='Zh-CN' profile='1'/>";
+	detailAjaxObj.url = ["http://"+ip+":"+port+"/GetItemData","data/detailProgData_1.xml"][DEBUG];
+	detailAjaxObj.requestData("POST");
+	Utility.println("detailMovie getDetailData urlParameters="+detailAjaxObj.urlParameters);
+	Utility.println("detailMovie getDetailData url="+detailAjaxObj.url);
+}
+
+function initDetailInfo(){
+	var srcPrefix = DEBUG == 0 ? ("http://" + ip + ":" + port + "/") : "";
+	var posterUrl = "img/detailDefault.jpg";
+	if(typeof(movieObj.Image) != "undefined"){
+		for(var k = 0; k < movieObj.Image.length; k++){
+			if(movieObj.Image[k].width == "410" && movieObj.Image[k].height == "543"){
+				posterUrl = srcPrefix + movieObj.Image[k].posterUrl;
+			}
+		}
+	}
+	$("poster").src = posterUrl;
+
+	var hdOrSd = movieObj.SelectionChoices[0].format;
+	Utility.println("detailMovie getDetailData hdOrSd="+hdOrSd);	
+	if(hdOrSd == "HD"){
+		$("hdOrSd").src = "img/h.png";
+	}
+
+	var name = movieObj.titleFull;
+	Utility.println("detailMovie getDetailData name="+name);	
+	if(typeof(name) != "undefined" && name != ""){
+		$("name").innerText = getStrChineseLen(name,20);
+	}
+	else $("name").innerText = "暂无名称";
+
+	var director = movieObj.Director[0].name;
+	Utility.println("detailMovie getDetailData director="+director);	
+	if(typeof(director) == "undefined" || director == ""){
+		director = "暂无";
+	}
+
+	var actor = movieObj.actorsDisplay;
+	Utility.println("detailMovie getDetailData actor="+actor);	
+	if(typeof(actor) == "undefined" || actor == ""){
+		actor = "暂无";
+	}
+	
+	var runtime = movieObj.runtime;
+	Utility.println("detailMovie getDetailData runtime="+runtime);	
+	if(typeof(runtime) == "undefined" || runtime == ""){
+		runtime = "未知";
+	}
+
+	var introduction = movieObj.summarMedium;
+	Utility.println("detailMovie getDetailData introduction="+introduction);	
+	if(typeof(introduction) == "undefined" || introduction == ""){
+		introduction = "暂无";
+	}
+
+	$("descInfo").innerHTML = "导演：" + director + "<br/>主演：" + actor + "<br/>片长：" + runtime + "<br/>故事简介：" + introduction;
+}
+
+function doSelect(){
+	if(moreInfoShowFlag){
+		if(moreInfoPos == 0){//试看
+			if(movieObj) getPreview();
+		}
+		else if(moreInfoPos == 1){//收藏
+			if(movieObj) addBookMark();
+		}
+		/*else if(moreInfoPos == 2){//评分
+		}
+		else if(moreInfoPos == 3){//推荐
+		}*/
+		else if(moreInfoPos == 2){//搜索
+            window.location.href = "http://vod.fjgdwl.com:80/FJ_Search/fjsearch.htm";
+//			window.location.href = searchUrl+"?assetId=" + menuAssetIdsMovie[menuType] + "&backUrl="+returnIp+"listMovie.htm?type="+menuType+"&listArea=" + listArea + "&listCurrPage=" + listCurrPage + "&listDataPos=" + listDataPos;
+		}
+		else if(moreInfoPos == 3){//本月排行
+			window.location.href = "ranking.htm?assetId=" + menuAssetIdsMovie[menuType] + "&backUrl=listMovie.htm?type="+menuType+"&listArea=" + listArea + "&listCurrPage=" + listCurrPage + "&listDataPos=" + listDataPos;
+		}
+		else if(moreInfoPos == 4){//收藏记录
+			window.location.href = "bookMark.htm?assetId=" + menuAssetIdsMovie[menuType] + "&backUrl=listMovie.htm?type="+menuType+"&listArea=" + listArea + "&listCurrPage=" + listCurrPage + "&listDataPos=" + listDataPos;
+		}
+		else if(moreInfoPos == 5){//观看记录
+			window.location.href = "viewRecord.htm?assetId=" + menuAssetIdsMovie[menuType] + "&backUrl=listMovie.htm?type="+menuType+"&listArea=" + listArea + "&listCurrPage=" + listCurrPage + "&listDataPos=" + listDataPos;
+		}
+		return;
+	}
+	if(movieObj){
+		if(resumeTipsFlag){
+			if(resumeTipsPos == 0){//断点播放
+				getResumeParams();
+			}
+			else{//从头播
+				getPlayParams();
+			}
+			hideResumeTips();
+		}
+		else{
+			if(chargeMode == "1"){//包月
+				validatePlayEligibility();
+			}
+			else if(chargeMode == "5" || chargeMode == "6"){//按此
+				validatePlayEligibility();
+			}
+			else{//免费
+				startPlay();
+			}
+		}
+	}
+}
+
+function startPlay(){
+	checkSavedProgram();
+}
+
+/*检测是否存在断点，接口：CheckSavedProgram*/
+function checkSavedProgram(){
+	if(detailAjaxObj == null){
+		detailAjaxObj = new ajaxClass();
+		detailAjaxObj.frame = window;
+	}else {
+		detailAjaxObj.requestAbort();
+	}
+	clearTimeout(msgTimeout);
+	//$("popText").innerText = "正在获取书签，请稍等！";
+	//$("popMsg").style.visibility = "visible";
+	$("loadingIcon").style.visibility = "visible";
+	tipShowFlag = true;
+	detailAjaxObj.successCallback = function(_xmlHttp, _params) {
+		Utility.println("detailMovie checkSavedProgram request success!");
+		var data = parseDom(this.getResponseXML());
+		var jsonData = parseJson(data.toJson());
+		if(typeof(jsonData) != "object" || jsonData == null) {
+			Utility.println("detailMovie checkSavedProgram error! error_code="+jsonData.error_code);
+			//$("popText").innerText = "获取书签失败，直接重头开始播放！";
+			//msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;getPlayParams();',3000);
+			getPlayParams();
+			return;
+		}
+		var key = "NavServerResponse";
+		Utility.println("detailMovie checkSavedProgram key in jsonData=" + (key in jsonData));
+		if(key in jsonData){
+			var message = jsonData.NavServerResponse[0].message;
+			var code = jsonData.NavServerResponse[0].code;
+			Utility.println("detailMovie checkSavedProgram message="+message+"&&code="+code);
+			//$("popText").innerText = "获取书签失败，错误码："+code+"，请咨询客服96311，直接重头开始播放！";
+			//msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;getPlayParams();',3000);
+			getPlayParams();
+		}else if("CheckSavedProgramResult" in jsonData){
+			var bookmarkFlag = jsonData.CheckSavedProgramResult[0].bookmarkFlag;
+			timePosition = jsonData.CheckSavedProgramResult[0].timePosition;
+			Utility.println("detailMovie checkSavedProgram bookmarkFlag="+bookmarkFlag+"&&timePosition="+timePosition);
+			if(bookmarkFlag == "true"){
+				$("popMsg").style.visibility = "hidden";
+				$("loadingIcon").style.visibility = "hidden";
+				tipShowFlag = false;
+				showResumeTips();
+			}
+			else getPlayParams();
+		}else{
+			//$("popText").innerText = "获取书签失败，直接重头开始播放！";
+			//msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;getPlayParams();',3000);
+			getPlayParams();
+		}
+	};
+	detailAjaxObj.failureCallback = function(_xmlHttp,_params){
+		Utility.println("detailMovie checkSavedProgram request failed");
+		//$("popText").innerText = "获取书签失败，直接重头开始播放！";
+		//msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;getPlayParams();',3000);
+		getPlayParams();
+	};
+	var tmpServiceId = serviceId;
+	if(chargeMode == "5" || chargeMode == "6") tmpServiceId = movieObj.serviceId;
+	detailAjaxObj.urlParameters = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?><CheckSavedProgram assetId='" + movieObj.assetId + "' portalId='1' client='" + CAManager.cardSerialNumber + "' account='" + account + "' folderAssetId='" + movieObj.folderAssetId + "' providerId='" + movieObj.providerId + "' profile='1.0' languageCode='zh-CN'/>";
+	detailAjaxObj.url = "http://" + ip + ":" + port +"/CheckSavedProgram";
+	detailAjaxObj.requestData("POST");
+	Utility.println("detailMovie checkSavedProgram urlParameters = " + detailAjaxObj.urlParameters);
+	Utility.println("detailMovie checkSavedProgram ajaxUrl = " + detailAjaxObj.url);
+}
+
+/* 断点提示框*/
+function showResumeTips(){
+	$("playTips").style.visibility = "visible";
+	resumeTipsFlag = true;
+	resumeTipsPos = 0;
+	$("playBtn0").style.backgroundImage = "url(img/botton0_2.png)";
+	$("playBtn1").style.backgroundImage = "url(img/botton0_1.png)";
+}
+
+function hideResumeTips(){
+	$("playTips").style.visibility = "hidden";
+	resumeTipsFlag = false;
+}
+
+function changeResumeTipsPos(){
+	resumeTipsPos = resumeTipsPos == 0 ? 1 : 0;
+	$("playBtn0").style.backgroundImage = ["url(img/botton0_2.png)","url(img/botton0_1.png)"][resumeTipsPos];
+	$("playBtn1").style.backgroundImage = ["url(img/botton0_1.png)","url(img/botton0_2.png)"][resumeTipsPos];
+}
+
+/*更多信息*/
+function showMoreInfo(){
+	moreInfoPos = 0;
+	$("moreFocus").style.left = "103px";
+	$("moreInfo").style.visibility = "visible";
+	moreInfoShowFlag = true;
+	clearTimeout(moreInfoTimeout);
+	moreInfoTimeout = setTimeout("hideMoreInfo()",6000);
+}
+
+function hideMoreInfo(){
+	$("moreInfo").style.visibility = "hidden";
+	moreInfoShowFlag = false;
+}
+
+function chageMoreInfoPos(_num){
+	moreInfoPos += _num;
+	if(moreInfoPos < 0) moreInfoPos = 5;
+	if(moreInfoPos > 5) moreInfoPos = 0;
+	var left = [103,225,334,473,679,884];
+	$("moreFocus").style.left = left[moreInfoPos] + "px";
+	clearTimeout(moreInfoTimeout);
+	moreInfoTimeout = setTimeout("hideMoreInfo()",6000);
+}
+
+/*判断是否已经订购了，接口：ValidatePlayEligibility*/
+function validatePlayEligibility(){
+	if(detailAjaxObj == null){
+		detailAjaxObj = new ajaxClass();
+		detailAjaxObj.frame = window;
+	}else {
+		detailAjaxObj.requestAbort();
+	}
+	clearTimeout(msgTimeout);
+	//$("popText").innerText = "正在鉴权，请稍等！";
+	//$("popMsg").style.visibility = "visible";
+	$("loadingIcon").style.visibility = "visible";
+	tipShowFlag = true;
+	detailAjaxObj.successCallback = function(_xmlHttp, _params) {
+		Utility.println("detailMovie validatePlayEligibility request success!");
+		var data = parseDom(this.getResponseXML());
+		var jsonData = parseJson(data.toJson());
+		if(typeof(jsonData) != "object" || jsonData == null) {
+			Utility.println("detailMovie validatePlayEligibility error! error_code="+jsonData.error_code);
+			$("popText").innerText = "鉴权失败，请稍后再试！";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("popMsg").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+			return;
+		}
+		var key = "NavServerResponse";
+		Utility.println("detailMovie validatePlayEligibility key in jsonData=" + (key in jsonData));
+		if(key in jsonData){
+			var message = jsonData.NavServerResponse[0].message;
+			var code = jsonData.NavServerResponse[0].code;
+			Utility.println("detailMovie validatePlayEligibility message="+message+"&&code="+code);
+			$("popText").innerText = "鉴权失败，错误码："+code+"，请咨询客服96311。";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("popMsg").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+		}else if("PlayEligibility" in jsonData){
+			var orderFlag = jsonData.PlayEligibility[0].orderFlag;
+			Utility.println("detailMovie validatePlayEligibility orderFlag="+orderFlag);
+			if(orderFlag == "Y"){
+				startPlay();
+			}else{
+				//$("popText").innerText = "正在获取订购价格，请稍等！";
+				getUpsellOffer();
+			}
+			
+		}else{
+			$("popText").innerText = "鉴权失败，请稍后再试！";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("popMsg").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+		}
+	};
+	detailAjaxObj.failureCallback = function(_xmlHttp,_params){
+		Utility.println("detailMovie validatePlayEligibility request failed");
+		$("popText").innerText = "鉴权失败，请稍后再试！";
+		msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+		$("popMsg").style.visibility = "visible";
+		$("loadingIcon").style.visibility = "hidden";
+	};
+	var tmpServiceId = serviceId;
+	if(chargeMode == "5" || chargeMode == "6") tmpServiceId = movieObj.serviceId;
+	detailAjaxObj.urlParameters = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?><ValidatePlayEligibility assetId='" + assetId + "' portalId='1' client='" + CAManager.cardSerialNumber + "' account='" + account + "' serviceId='" + tmpServiceId + "'/>";
+	detailAjaxObj.url = "http://" + ip + ":" + port +"/ValidatePlayEligibility";
+	detailAjaxObj.requestData("POST");
+	Utility.println("detailMovie validatePlayEligibility urlParameters = " + detailAjaxObj.urlParameters);
+	Utility.println("detailMovie validatePlayEligibility ajaxUrl = " + detailAjaxObj.url);
+}
+
+/*获得用户对产品的购买价格,接口：GetUpsellOffer*/
+function getUpsellOffer(){
+	if(detailAjaxObj == null){
+		detailAjaxObj = new ajaxClass();
+		detailAjaxObj.frame = window;
+	}else {
+		detailAjaxObj.requestAbort();
+	}
+	detailAjaxObj.successCallback = function(_xmlHttp, _params) {
+		Utility.println("detailMovie getUpsellOffer request success!");
+		var data = parseDom(this.getResponseXML());
+		var jsonData = parseJson(data.toJson());
+		if(typeof(jsonData) != "object" || jsonData == null) {
+			Utility.println("detailMovie getUpsellOffer error! error_code="+jsonData.error_code);
+			$("popText").innerText = "您未订购该产品，价格：未知，请到营业厅购买！";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("popMsg").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+			return;
+		}
+		var key = "NavServerResponse";
+		Utility.println("detailMovie getUpsellOffer key in jsonData=" + (key in jsonData));
+		if(key in jsonData){
+			var message = jsonData.NavServerResponse[0].message;
+			var code = jsonData.NavServerResponse[0].code;
+			Utility.println("detailMovie getUpsellOffer message="+message+"&&code="+code);
+			$("popText").innerText = "您未订购该产品，价格：未知，请到营业厅购买！";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("popMsg").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+		}else if("UpsellOffer" in jsonData){
+			var displayPrice = jsonData.UpsellOffer[0].displayPrice;
+			Utility.println("detailMovie getUpsellOffer displayPrice=" + displayPrice);
+			$("popText").innerText = "您未订购该产品，价格："+displayPrice+"元，请到营业厅购买！";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("popMsg").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+		}else{
+			$("popText").innerText = "您未订购该产品，价格：未知，请到营业厅购买！";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("popMsg").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+		}
+	};
+	detailAjaxObj.failureCallback = function(_xmlHttp,_params){
+		Utility.println("detailMovie getUpsellOffer request failed");
+		$("popText").innerText = "您未订购该产品，价格：未知，请到营业厅购买！";
+		msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+		$("popMsg").style.visibility = "visible";
+		$("loadingIcon").style.visibility = "hidden";
+	};
+	var tmpServiceId = serviceId;
+	if(chargeMode == "5" || chargeMode == "6") tmpServiceId = movieObj.serviceId;
+	detailAjaxObj.urlParameters = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?><GetUpsellOffer portalId='1' client='" + CAManager.cardSerialNumber + "' account='" + account + "' serviceId='" + tmpServiceId + "'/>";
+	detailAjaxObj.url = "http://" + ip + ":" + port +"/GetUpsellOffer";
+	detailAjaxObj.requestData("POST");
+	Utility.println("detailMovie getUpsellOffer urlParameters = " + detailAjaxObj.urlParameters);
+	Utility.println("detailMovie getUpsellOffer ajaxUrl = " + detailAjaxObj.url);
+}
+
+/*获取播放参数，接口：SelectionStart*/
+function getPlayParams(){
+	if (detailAjaxObj == null) {
+		detailAjaxObj = new ajaxClass();
+		detailAjaxObj.frame = window;
+	} else {
+		detailAjaxObj.requestAbort();
+	}
+	clearTimeout(msgTimeout);
+	//$("popText").innerText = "正在请求播放数据，请稍等！";
+	//$("popMsg").style.visibility = "visible";
+	$("loadingIcon").style.visibility = "visible";
+	tipShowFlag = true;
+	detailAjaxObj.successCallback = function(_xmlHttp, _params) {
+		Utility.println("detailMovie getPlayParams request success!");
+		Utility.println("detailMovie getPlayParams _xmlHttp.responseText="+_xmlHttp.responseText);
+		var data = parseDom(this.getResponseXML());
+		var jsonData = parseJson(data.toJson());
+		if(typeof(jsonData) != "object" || jsonData == null) {
+			Utility.println("detailMovie getPlayParams error! error_code="+jsonData.error_code);
+			$("popText").innerText = "获取播放数据失败！";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("popMsg").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+			return;
+		}
+		if("NavServerResponse" in jsonData){
+			var message = jsonData.NavServerResponse[0].message;
+			var code = jsonData.NavServerResponse[0].code;
+			Utility.println("detailMovie getPlayParams error! message="+message+";code="+code);
+			$("popText").innerText = "发生错误！错误码："+code+"，请咨询客服96311。";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("popMsg").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+			return;
+		}
+		$("popMsg").style.visibility = "hidden";
+		$("loadingIcon").style.visibility = "hidden";
+		tipShowFlag = false;
+		var rtsp = jsonData.StartResponse[0].rtsp.split(";");
+		var serverId = rtsp[2].split(":");
+		var playUrl = rtsp[0] + ";" + rtsp[1] + ";" + serverId[0] + ":8080" + ";areacode=" + area_code + ";client=" + CAManager.cardSerialNumber;
+		GlobalVarManager.setItemStr("vodPlayUrl",playUrl);
+		Utility.println("detailMovie getPlayParams playUrl="+playUrl);
+		var resumePoint = 0;
+
+		window.location.href = playIp + "vodPlay.htm?previewId=" + jsonData.StartResponse[0].previewAssetId + "&startTime=" + jsonData.StartResponse[0].startTime + "&purchaseToken=" + jsonData.StartResponse[0].purchaseToken + "&playCurrName=" + movieObj.titleBrief + "&assetId=" + assetId + "&rentDateTime=" + movieObj.RentalInfo[0].rentDateTime + "&providerId=" + movieObj.providerId + "&displayRunTime=" + movieObj.displayRunTime + "&folderAssetId=" + movieObj.folderAssetId + "&resumePoint=" + resumePoint + "&back="+ returnIp + "detailMovie.htm#type=" + menuType + "&assetId=" + assetId + "&serviceId=" + serviceId + "&chargeMode=" + chargeMode + "&listArea=" + listArea + "&listCurrPage=" + listCurrPage + "&listDataPos=" + listDataPos;
+	};
+	detailAjaxObj.failureCallback = function(_xmlHttp,_params){
+		Utility.println("detailMovie getPlayParams request failed");
+		$("popText").innerText = "获取播放数据失败！";
+		msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+		$("popMsg").style.visibility = "visible";
+		$("loadingIcon").style.visibility = "hidden";
+	};
+	var tmpServiceId = serviceId;
+	if(chargeMode == "5" || chargeMode == "6") tmpServiceId = movieObj.serviceId;
+	detailAjaxObj.urlParameters = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?><SelectionStart titleAssetId='" + assetId + "' folderAssetId='" + assetId + "' portalId='1'  client='" + CAManager.cardSerialNumber + "' account='" + account + "' serviceId='" + tmpServiceId +"'/>";
+
+	detailAjaxObj.url = "http://" + ip + ":" + port + "/SelectionStart";
+	Utility.println("detailMovie getPlayParams urlParameters="+detailAjaxObj.urlParameters);
+	Utility.println("detailMovie getPlayParams ajaxUrl="+detailAjaxObj.url);
+	detailAjaxObj.requestData("POST");
+}
+
+/*获取断点播放参数，接口：SelectionResume*/
+function getResumeParams(){
+	if (detailAjaxObj == null) {
+		detailAjaxObj = new ajaxClass();
+		detailAjaxObj.frame = window;
+	} else {
+		detailAjaxObj.requestAbort();
+	}
+	clearTimeout(msgTimeout);
+	//$("popText").innerText = "正在请求播放数据，请稍等！";
+	//$("popMsg").style.visibility = "visible";
+	$("loadingIcon").style.visibility = "visible";
+	tipShowFlag = true;
+	detailAjaxObj.successCallback = function(_xmlHttp, _params) {
+		Utility.println("detailMovie getResumeParams request success!");
+		Utility.println("detailMovie getResumeParams _xmlHttp.responseText="+_xmlHttp.responseText);
+		var data = parseDom(this.getResponseXML());
+		var jsonData = parseJson(data.toJson());
+		if(typeof(jsonData) != "object" || jsonData == null) {
+			Utility.println("detailMovie getResumeParams error! error_code="+jsonData.error_code);
+			$("popText").innerText = "获取播放数据失败！";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("popMsg").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+			return;
+		}
+		if("NavServerResponse" in jsonData){
+			var message = jsonData.NavServerResponse[0].message;
+			var code = jsonData.NavServerResponse[0].code;
+			Utility.println("detailMovie getResumeParams error! message="+message+";code="+code);
+			$("popText").innerText = "发生错误！错误码："+code+"，请咨询客服96311。";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("popMsg").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+			return;
+		}
+		$("popMsg").style.visibility = "hidden";
+		$("loadingIcon").style.visibility = "hidden";
+		tipShowFlag = false;
+		var rtsp = jsonData.ResumeResponse[0].rtsp.split(";");
+		var serverId = rtsp[2].split(":");
+		var playUrl = rtsp[0] + ";" + rtsp[1] + ";" + serverId[0] + ":8080" + ";areacode=" + area_code + ";client=" + CAManager.cardSerialNumber;
+		GlobalVarManager.setItemStr("vodPlayUrl",playUrl);
+		Utility.println("detailMovie getResumeParams playUrl="+playUrl);
+
+		window.location.href = playIp + "vodPlay.htm?previewId=" + jsonData.ResumeResponse[0].previewAssetId + "&startTime=" + jsonData.ResumeResponse[0].startTime + "&purchaseToken=" + jsonData.ResumeResponse[0].purchaseToken + "&playCurrName=" + movieObj.titleBrief + "&assetId=" + assetId + "&rentDateTime=" + movieObj.RentalInfo[0].rentDateTime + "&providerId=" + movieObj.providerId + "&displayRunTime=" + movieObj.displayRunTime + "&folderAssetId=" + movieObj.folderAssetId + "&resumePoint=" + timePosition + "&back="+ returnIp + "detailMovie.htm#type=" + menuType + "&assetId=" + assetId + "&serviceId=" + serviceId + "&chargeMode=" + chargeMode + "&listArea=" + listArea + "&listCurrPage=" + listCurrPage + "&listDataPos=" + listDataPos;
+	};
+	detailAjaxObj.failureCallback = function(_xmlHttp,_params){
+		Utility.println("detailMovie getResumeParams request failed");
+		$("popText").innerText = "获取播放数据失败！";
+		msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+		$("popMsg").style.visibility = "visible";
+		$("loadingIcon").style.visibility = "hidden";
+	};
+	var tmpServiceId = serviceId;
+	if(chargeMode == "5" || chargeMode == "6") tmpServiceId = movieObj.serviceId;
+	detailAjaxObj.urlParameters = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?><SelectionResume portalId='1'  client='" + CAManager.cardSerialNumber + "' account='" + account + "' titleProviderId='" + movieObj.providerId +"' titleAssetId='" + assetId + "' purchaseToken='" + timePosition + "' fromStart='N' serviceId='" + tmpServiceId + "'/>";
+
+	detailAjaxObj.url = "http://" + ip + ":" + port + "/SelectionResume";
+	Utility.println("detailMovie getResumeParams urlParameters="+detailAjaxObj.urlParameters);
+	Utility.println("detailMovie getResumeParams ajaxUrl="+detailAjaxObj.url);
+	detailAjaxObj.requestData("POST");
+}
+
+/*=============试看、收藏 =============start*/
+
+/*试看，接口：SelectionStart*/
+function getPreview(){
+	if (detailAjaxObj == null) {
+		detailAjaxObj = new ajaxClass();
+		detailAjaxObj.frame = window;
+	} else {
+		detailAjaxObj.requestAbort();
+	}
+	clearTimeout(msgTimeout);
+	//$("popText").innerText = "正在请求播放数据，请稍等！";
+	//$("popMsg").style.visibility = "visible";
+	$("loadingIcon").style.visibility = "visible";
+	tipShowFlag = true;
+	detailAjaxObj.successCallback = function(_xmlHttp, _params) {
+		Utility.println("detailMovie getPreview request success!");
+		var data = parseDom(this.getResponseXML());
+		var jsonData = parseJson(data.toJson());
+		if(typeof(jsonData) != "object" || jsonData == null) {
+			Utility.println("detailMovie getPreview error! error_code="+jsonData.error_code);
+			$("popText").innerText = "获取播放数据失败！";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("popMsg").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+			return;
+		}
+		if("NavServerResponse" in jsonData){
+			var message = jsonData.NavServerResponse[0].message;
+			var code = jsonData.NavServerResponse[0].code;
+			Utility.println("detailMovie getPreview error! message="+message+";code="+code);
+			$("popText").innerText = "发生错误！错误码："+code+"，请咨询客服96311。";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("popMsg").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+			return;
+		}
+		$("popMsg").style.visibility = "hidden";
+		$("loadingIcon").style.visibility = "hidden";
+		tipShowFlag = false;
+		var rtsp = jsonData.StartResponse[0].rtsp.split(";");
+		var serverId = rtsp[2].split(":");
+		var playUrl = rtsp[0] + ";" + rtsp[1] + ";" + serverId[0] + ":8080" + ";areacode=" + area_code + ";client=" + CAManager.cardSerialNumber;
+ 		GlobalVarManager.setItemStr("vodPlayUrl",playUrl);
+		var displayRunTime = jsonData.StartResponse[0].displayRunTime;
+		var resumePoint = jsonData.StartResponse[0].startTime;
+		if(displayRunTime == "" || displayRunTime == "undefined" || typeof(displayRunTime) == "undefined"){
+			displayRunTime = 600;
+		}		
+		if(resumePoint == "" || resumePoint == "undefined" || typeof(resumePoint) == "undefined"){
+			resumePoint = 0;
+		}		
+		Utility.println("detailMovie getPreview playUrl=" + playUrl + "__StartResponse=" + jsonData.StartResponse[0].rtsp + "__displayRunTime=" + displayRunTime + "__resumePoint=" + resumePoint);
+
+		window.location.href = playIp + "vodPlay.htm?previewId=" + jsonData.StartResponse[0].previewAssetId + "&startTime=" + jsonData.StartResponse[0].startTime + "&purchaseToken=" + jsonData.StartResponse[0].purchaseToken + "&playCurrName=" + movieObj.titleBrief + "&assetId=" + assetId + "&rentDateTime=" + movieObj.RentalInfo[0].rentDateTime + "&providerId=" + movieObj.providerId + "&displayRunTime=" + displayRunTime + "&folderAssetId=" + movieObj.folderAssetId + "&resumePoint=" + resumePoint + "&back="+ returnIp + "detailMovie.htm#type=" + menuType + "&assetId=" + assetId + "&serviceId=" + serviceId + "&chargeMode=" + chargeMode + "&listArea=" + listArea + "&listCurrPage=" + listCurrPage + "&listDataPos=" + listDataPos;
+
+	};
+	detailAjaxObj.failureCallback = function(_xmlHttp,_params){
+		Utility.println("detailMovie getPreview request failed");
+		$("popText").innerText = "获取播放数据失败！";
+		msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+		$("popMsg").style.visibility = "visible";
+		$("loadingIcon").style.visibility = "hidden";
+	};
+	detailAjaxObj.urlParameters = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?><SelectionStart titleAssetId='" + assetId + "' folderAssetId='" + assetId + "' portalId='1' client='"+CAManager.cardSerialNumber + "' account='" + account + "' serviceId='" + movieObj.serviceId + "' playPreview='Y'/>";
+
+	detailAjaxObj.url = "http://" + ip + ":" + port +"/SelectionStart";
+	Utility.println("detailMovie__getPreview__urlParameters = " + detailAjaxObj.urlParameters);
+	Utility.println("detailMovie__getPreview__ajaxUrl = " + detailAjaxObj.url);
+	detailAjaxObj.requestData("POST");
+}
+
+/*添加书签，接口AddBookmark*/
+function addBookMark(){
+	if (detailAjaxObj == null) {
+		detailAjaxObj = new ajaxClass();
+		detailAjaxObj.frame = window;
+	} else {
+		detailAjaxObj.requestAbort();
+	}
+	clearTimeout(msgTimeout);
+	//$("popText").innerText = "正在收藏影片，请稍等！";
+	//$("popMsg").style.visibility = "visible";
+	$("loadingIcon").style.visibility = "visible";
+	tipShowFlag = true;
+	detailAjaxObj.successCallback = function(_xmlHttp, _params) {
+		Utility.println("detailMovie__addBookMark__successCallback__[INFO] Success to get vod category from server.");	
+		var data = parseDom(this.getResponseXML());
+		var jsonData = parseJson(data.toJson());
+		var key = "AddBookmarkResult";
+		Utility.println("detailMovie__addBookMark__successCallback__key=" + (key in jsonData) + "__key=" + key);
+		if(key in jsonData){
+			Utility.println("detailMovie__addBookMark__successCallback__bookmarkedId=" + jsonData.AddBookmarkResult[0].bookmarkedId);
+			$("popText").innerText = "收藏影片成功！";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("popMsg").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+		}else if("NavServerResponse" in jsonData){
+			var message = jsonData.NavServerResponse[0].message;
+			var code = jsonData.NavServerResponse[0].code;
+			Utility.println("detailMovie addBookMark error! message="+message+";code="+code);
+			$("popText").innerText = "发生错误！错误码："+code+"，请咨询客服96311。";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+			$("popMsg").style.visibility = "visible";
+			$("loadingIcon").style.visibility = "hidden";
+		}
+	};
+	detailAjaxObj.failureCallback = function(_xmlHttp,_params){
+		Utility.println("detailMovie__addBookMark__failureCallback__[ERROR] Failed to get vod category from server!");
+		$("popText").innerText = "收藏影片失败！";
+		msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',3000);
+		$("popMsg").style.visibility = "visible";
+		$("loadingIcon").style.visibility = "hidden";
+	};
+	detailAjaxObj.urlParameters = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?><AddBookmark titleAssetId='" + assetId + "' custom='VOD' folderAssetId='" + assetId + "' portalId='1'  client='" + CAManager.cardSerialNumber +"' account='"+account+"'/>";
+
+	detailAjaxObj.url = "http://" + ip + ":" + port + "/AddBookmark";
+	Utility.println("detailMovie__addBookMark__urlParameters = " + detailAjaxObj.urlParameters);
+	Utility.println("detailMovie__addBookMark__ajaxUrl = " + detailAjaxObj.url);
+	detailAjaxObj.requestData("POST");
+}
+
+/*=============试看、收藏 =============end*/
+function backurl(){
+	if(backtype == 1 )
+	window.location.href = "index.html?listArea="+listArea+"&listCurrPage="+listCurrPage+"&listDataPos="+listDataPos;
+	else if(backtype == "2")
+	window.location.href = "movie_2/fengyun.html?listArea="+listArea+"&listCurrPage="+listCurrPage+"&listDataPos="+listDataPos;
+	else if(backtype == "3")
+	window.location.href = "movie_2/dapian.html?listArea="+listArea+"&listCurrPage="+listCurrPage+"&listDataPos="+listDataPos;
+	else if(backtype == "4")
+	window.location.href = "movie_2/texiao.html?listArea="+listArea+"&listCurrPage="+listCurrPage+"&listDataPos="+listDataPos;
+	else if(backtype == "5")
+	window.location.href = "movie_3/move_sort.html?listArea="+listArea+"&listCurrPage="+listCurrPage+"&listDataPos="+listDataPos;
+	else if(backtype == "6")
+	window.location.href = "movie_3/move_PianHua.html?listArea="+listArea+"&listCurrPage="+listCurrPage+"&listDataPos="+listDataPos;
+	else if(backtype == "7")
+	window.location.href = "movie_3/move_XiaXian.html?listArea="+listArea+"&listCurrPage="+listCurrPage+"&listDataPos="+listDataPos;
+}
+function exit() {
+	if(detailAjaxObj != null) {
+		detailAjaxObj.requestAbort();
+	}
+}
+
+</script>
+<style>
+.bg td{background:url(num_bg.png) center no-repeat; font-size:31px; line-height:66px; text-align:center;}
+</style>
+</head>
+
+<body background="img/bg13.jpg" leftmargin="0" topmargin="0" onLoad="init()" onUnload="exit()">
+<div id="title" style="position:absolute; left:348px; top:75px; width:460px; height:31px; font-size:30px; color:#ffffff;">互动点播 &gt;电影</div>
+<div id="dateTime" style="position:absolute; left:890px; top:71px; width:300px; height:40px; font-size:26px; color:#fff; line-height:40px; text-align:right; ">&nbsp;</div>
+
+<div id="tips" style="position:absolute; left:463px; top:225px; width:680px; height:137px; font-size:24px; visibility:hidden;">正在请求数据，请稍等！</div>
+
+<div style="position:absolute; top:141px; left:97px; height:445px; width:331px;">
+	<img id="poster" src=" " width="331" height="445" />
+	<div style="position:absolute; top:335px; left:220px; height:110px; width:110px;"><img id="hdOrSd" src=" " width="110" height="110" /></div>
+</div>
+
+<div style="position:absolute; left:464px; top:129px; width:710px; height:400px; overflow:hidden;">
+<div style="position:absolute; left:0px; top:0px; width:710px;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size:35px; ">
+    <tr>
+      <td id="name" width="51%" height="61" style="color:#ffffff;">&nbsp;</td>
+    </tr>
+    <tr>
+      <td id="descInfo" height="61" style="font-size:24px; color:#eef0f1; line-height:42px;">&nbsp;</td>
+    </tr>
+  </table>
+</div>
+</div>
+<div id="playBtn" style="position:absolute; left:462px; top:535px; width:44px; height:29px; visibility:hidden;"><img src="img/play01.png" width="121" height="53" /></div>
+
+<!--加载图标-->
+<div id="loadingIcon" style="position:absolute; left:579px; top:299px; width:121px; height:121px; visibility:hidden;"><img src="img/loadingIcon.gif" width="121" height="121" /></div>
+
+<div style="position:absolute; left:389px; top:200px; width:478px; height:285px; background-image: url(img/pop_btm0.png); background-repeat:no-repeat; text-align:center; -webkit-transition-duration:200ms; z-index:2; visibility:hidden;" id="popMsg">
+  <table width="396" height="269" border="0" cellpadding="0" cellspacing="0" style="color:#FFFFFF">
+    <tr>
+      <td height="57" colspan="3" align="center" id="hdTitle" style="font-size:32px;">温馨提示</td>
+    </tr>
+    
+    <tr>
+      <td colspan="3" id="popText" align="center" style="font-size:24px; color:#caced1; line-height:45px;">正在请求播放数据，请稍等！</td>
+    </tr>
+  </table>
+</div>
+
+<!-- 断点提示框 -->
+<div style="position:absolute; left:389px; top:200px; width:478px; height:285px; background-image: url(img/pop_btm0.png); background-repeat:no-repeat; text-align:center;-webkit-transition-duration:200ms; z-index:2; visibility:hidden;" id="playTips">
+  <table width="396" height="269" border="0" cellpadding="0" cellspacing="0" style="color:#FFFFFF">
+    <tr>
+      <td height="57" colspan="3" align="center" id="hdTitle" style="font-size:32px;">温馨提示</td>
+    </tr>
+    
+    <tr>
+      <td colspan="3" id="hdContent" style="font-size:24px; color:#caced1; line-height:45px;" align="center">是否从上次断点开始播放?</td>
+    </tr>
+	<tr>
+	  <td height="73" align="center" style="background:url(img/botton0_2.png) no-repeat center; color:#000; font-size:27px;" id="playBtn0">是</td>
+      <td align="center" style="background:url(img/botton0_1.png) no-repeat center; color:#000; font-size:27px;" id="playBtn1">否</td>
+    </tr>
+  </table>
+</div>
+
+<!--底部公告-->
+<div id="tipProgSummar" style="position:absolute; left:142px; top:610px; width:584px; height:44px; font-size:22px; color:#fefefe; line-height:44px; "></div>
+<div style="position:absolute; left:760px; top:618px; width:420px; height:34px;">
+<table border="0" cellpadding="0" cellspacing="0" style="color:#fefefe; font-size:22px;">
+	<tr>
+		<td width="52"><img src="img/tips11.png" width="51" height="34" /></td>
+		<td width="54">返回</td>
+		<td width="53"><img src="img/tips10.png" width="51" height="34" /></td>
+		<td width="56">退出</td>
+		<td width="51"><img src="img/tips12.png" width="51" height="34" /></td>
+		<td width="54">首页</td>
+		<td width="50"><img src="img/title09.png" width="50" height="34" /></td>
+		<td>更多</td>
+    </tr>
+</table>
+</div>
+
+<!--按信息键弹出-->    
+<div id="moreInfo" style="position:absolute; left:0px; top:605px; width:1280px; height:77px; background:url(img/pop_btm1.png) no-repeat left top; visibility:hidden; ">
+    <div id="moreFocus" style="position:absolute; left:103px; top:6px; width:227px; height:55px;"><img src="img/pop_Focus0.png" width="227" height="55" /></div>
+    <div style="position:absolute; left:72px; top:6px; width:1136px; height:55px;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size:28px; color:#ffffff; line-height:55px; text-align:center; ">
+        <tr>
+		  <td width="100"></td>
+          <td>试看</td>
+          <td>收藏</td>
+          <td>搜索</td>
+          <td>本月排行</td>
+          <td>收藏记录</td>
+          <td>观看记录</td>
+		  <td width="100"></td>
+        </tr>
+      </table>
+    </div>
+</div>
+</body>
+</html>

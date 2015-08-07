@@ -1,0 +1,874 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<meta name="page-view-size" content="1280*720" />
+		<title>move</title>
+		<script type="text/javascript" src="common.js"></script>
+		<script language="javascript">
+			var area = 1;
+			var lastArea = 0;
+			var lastPos = 0;
+			var listPos = 0;
+			var menuPos = 3;
+			var funcPos = 0;
+			var pagePos = 0;
+			var lastListPos = 0;
+			var flag = false;
+			var listProgs = [];
+
+			var menuType = 13;
+			var listAjaxObj = null;
+			var currPage = 0;
+			var totalPage = 0;
+			var itemPerPage = 14;
+			var listServiceId = "";
+			var listChargeMode = "";
+			var listCurrPage = 0;
+			var listArea = "";
+			var listDataPos = "";
+			var tipShowFlag = false;
+			var msgTimeout = 1;
+			var backtype = 4;
+            var MyMar="";
+			var sb = false;
+			var news = 0;
+			var columnName = "";
+			var pageID = "";
+			document.onkeypress = grdEvent;
+			document.onirkeypress = grdEvent;
+			document.onsystemevent = grdEvent;
+
+			function grdEvent(event) {
+				var keycode = event.which;
+				switch (keycode) {
+					case 3:
+					case 37:
+						if (area == 0) {
+							changeMenuPos(-1);
+						} else if (area == 1) {
+							changeListPos(-1);
+						//	mq();
+						} else if (area == 2) {
+							changePagePos(-1);
+						} else if (area == 3) {
+							changeFuncPos(-1);
+						}
+						return 0;
+						break;
+					case 1:
+					case 38:
+						if (area == 1 && listPos >= 7) {
+							changeListPos(-7);
+						//	mq();
+						} else if (area == 1) {
+							changeArea(0);
+	            getStrLen(listPos);
+							/*var name = listProgs[listPos].type == "S" ? listProgs[listPos].displayName : listProgs[listPos].titleBrief;
+							$("listProgName" + listPos).innerText = getStrChineseLen(name, 6);*/
+						} else if (area == 0) {
+							changeArea(3);
+						} else if (area == 2) {
+							changeArea(1);
+						/*	var nameall = listProgs[listPos].type == "S" ? listProgs[listPos].displayName : listProgs[listPos].titleBrief;
+							if (getStrChineseLength(nameall) > 6) {
+								$("listProgName" + listPos).innerHTML = "<marquee >" + nameall + "</marquee>";
+							}*/
+						}
+						return 0;
+						break;
+					case 4:
+					case 39:
+						if (area == 1) {
+							changeListPos(1);
+							//mq();
+						} else if (area == 0) {
+							changeMenuPos(1);
+						} else if (area == 2) {
+							changePagePos(1);
+						} else if (area == 3) {
+							changeFuncPos(1);
+						}
+						return 0;
+						break;
+					case 2:
+					case 40:
+						if (area == 1 && currPage != (totalPage - 1) && listPos <= 6) {
+							changeListPos(7);
+							//mq();
+						} else if (area == 1 && currPage != (totalPage - 1) && listPos >= 7) {
+							changeArea(2);
+							getStrLen(listPos);
+							/*var name = listProgs[listPos].type == "S" ? listProgs[listPos].displayName : listProgs[listPos].titleBrief;
+							$("listProgName" + listPos).innerText = getStrChineseLen(name, 6);*/
+						} else if (area == 1 && currPage == (totalPage - 1)) {
+							lastListPos = listProgs.length - 1;
+							if (lastListPos <= 6) {
+								changeArea(2);
+							getStrLen(listPos);
+								/*var name = listProgs[listPos].type == "S" ? listProgs[listPos].displayName : listProgs[listPos].titleBrief;
+								$("listProgName"+listPos).innerText = getStrChineseLen(name,6);
+								$("e"+listPos).innerText="";*/
+							} else {
+								if (listPos <= 6) {
+									if (listPos < (lastListPos % 7)) {
+										changeListPos(7);
+										//mq();
+									} else {
+										flag = true;
+										changeListPos(lastListPos);
+										//mq();
+									}
+								} else {
+									changeArea(2);
+									getStrLen(listPos);
+								/*var name = listProgs[listPos].type == "S" ? listProgs[listPos].displayName : listProgs[listPos].titleBrief;
+								$("listProgName"+listPos).innerText = getStrChineseLen(name,6);
+								$("e"+listPos).innerText="";*/
+								}
+							}
+						} else if (area == 0) {
+							changeArea(1);
+							/*var nameall = listProgs[listPos].type == "S" ? listProgs[listPos].displayName : listProgs[listPos].titleBrief;
+							if (getStrChineseLength(nameall) > 6) {
+								$("listProgName" + listPos).innerHTML = "<marquee >" + nameall + "</marquee>";
+							}*/
+						} else if (area == 3) {
+							changeArea(0);
+						}
+						return 0;
+						break;
+					case 372:
+					case 33:
+						changePage(-1);
+						return 0;
+						break;
+					case 373:
+					case 34:
+						changePage(1);
+						return 0;
+						break;
+					case 4097:
+					case 13:
+						if(sb==true) doSelect();
+						return 0;
+						break;
+					case 340: // back
+					case 339: // exit
+					case 8: // back
+					case 27: // exit
+					case 512:
+					case 513:
+					case 4098: // menu
+						gotoIndex();
+						return 0;
+						break;
+				}
+			}
+
+		/*	function mq() {
+				if (listPos > listProgs.length - 1) {
+					listPos = listProgs.length - 1;
+					$("focus").style.left = 96 + 160 * listPos + "px";
+					$("focus").style.top = 203 + 210 * listPos + "px";
+				}
+				var nameall = listProgs[listPos].type == "S" ? listProgs[listPos].displayName : listProgs[listPos].titleBrief;
+				if (getStrChineseLength(nameall) > 6) {
+					$("listProgName" + listPos).innerHTML = "<marquee>" + nameall + "</marquee>";
+				}
+				if (listProgs.length > 1) {
+					var name = listProgs[lastPos].type == "S" ? listProgs[lastPos].displayName : listProgs[lastPos].titleBrief;
+					$("listProgName" + lastPos).innerText = getStrChineseLen(name, 6);
+				}
+			}*/
+      function mq(){ 
+            if(listPos > listProgs.length - 1){
+				listPos = listProgs.length - 1;
+				$("focus").style.left = 96 + 160 * listPos + "px";
+				$("focus").style.top = 203 + 210 *listPos + "px";
+			}
+			var speed=10;
+            var scroll_begin = $("listProgName" + listPos); 
+            var scroll_end = $("e" + listPos); 
+            var scroll_div = $("scroll" + listPos); 
+            var name = listProgs[listPos].type == "S" ? listProgs[listPos].displayName : listProgs[listPos].titleBrief;
+           
+            if (getStrChineseLength(name) > 6){
+                scroll_begin.innerHTML=name+"&nbsp&nbsp&nbsp";
+                scroll_end.innerHTML=name+"&nbsp&nbsp&nbsp"; 
+               
+                function Marquee(){ 
+				    if(scroll_div.scrollLeft >=scroll_end.offsetWidth ) {
+                        scroll_div.scrollLeft-=scroll_begin.offsetWidth; 
+                    }else{
+                        scroll_div.scrollLeft++; 
+                    }
+               /*showPop("scroll_div.scrollLeft:"+scroll_div.scrollLeft+";"+"scroll_begin.offsetWidth:"+scroll_begin.offsetWidth+";"+"scroll_end.offsetWidth:"+scroll_end.offsetWidth);*/
+                } 
+                MyMar=setInterval(Marquee,speed); 
+                
+			}
+
+        }
+        function getStrLen(pos){
+        	clearmq(listPos);
+         	var name = listProgs[pos].type == "S" ? listProgs[pos].displayName : listProgs[pos].titleBrief;
+         	if (name != undefined){
+			    var len = getStrLength(name) < 12 ? getStrLength(name) : 12;
+			   //var len = name.length < 6 ? name.length:6;
+			    $("inscroll" + pos).style.left = ( 130 - len * 10 ) / 2 + "px";
+	            $("listProgName" + pos).innerText = getStrChineseLen(name,6);
+	            $("e" + pos).innerText = "";
+	            //showPop("length:"+getStrLength(name)+";"+"left:"+$("inscroll" + pos).style.left);
+	        }
+            
+        }
+    function getStrLength(str) {
+		str = str.replace(/[ ]*$/g, "");
+		var w = 0;
+		for (var i = 0; i < str.length; i++) {
+			var c = str.charCodeAt(i);
+			//单字节加1
+			if ((c >= 0x0001 && c <= 0x007e) || (0xff60 <= c && c <= 0xff9f)) {
+				w++;
+			} else {
+				w += 2;
+			}
+		}
+		return w;
+
+	}
+			function changeListPos(_num) {
+				lastPos = listPos;
+        getStrLen(lastPos);
+				if (currPage == (totalPage - 1) && flag) {
+					listPos = _num;
+					flag = false;
+				} else {
+					listPos += _num;
+				}
+				if (listPos < 0) {
+					listPos = listProgs.length - 1;
+				} else if (listPos > listProgs.length - 1) {
+					listPos = 0
+				}
+				$("focus").style.left = 96 + 160 * (listPos % 7) + "px";
+				$("focus").style.top = 204 + 210 * Math.floor(listPos / 7) + "px";
+        clearmq(listPos);
+			  mq();
+			}
+
+        function clearmq(listPos){
+			    clearInterval(MyMar);
+			    $("scroll" + listPos).scrollLeft = 0;
+		    }
+			function changePagePos(_num) {
+				pagePos += _num;
+				if (pagePos < 0) pagePos = 1;
+				if (pagePos > 1) pagePos = 0;
+				if (pagePos == 0) {
+					$("up").style.visibility = "visible";
+					$("down").style.visibility = "hidden";
+				} else {
+					$("up").style.visibility = "hidden";
+					$("down").style.visibility = "visible";
+				}
+
+			}
+
+			function changeMenuPos(_num) {
+				menuPos += _num;
+				if (menuPos < 0) menuPos = 6;
+				if (menuPos > 6) menuPos = 0;
+				$("focus").style.left = 100 + 158 * menuPos + "px";
+				$("focus").style.top = 120 + "px";
+			}
+
+			function changeFuncPos(_num) {
+				funcPos += _num;
+				if (funcPos < 0) funcPos = 3;
+				if (funcPos > 3) funcPos = 0;
+				$("focus").style.left = 894 + 77 * funcPos + "px";
+				$("focus").style.top = 70 + "px";
+			}
+
+			function changeArea(_area) {
+				lastArea = area;
+				area = _area;
+				if (_area == 0) {
+					if (lastArea == 1) {
+						clearmq(listPos);
+					    menuPos = listPos;
+					}
+					if (lastArea == 3) {
+						if(funcPos == 0 || funcPos == 1) menuPos = 5;
+					    if(funcPos == 2 || funcPos == 3) menuPos = 6;
+					}
+        	$("focus").style.visibility = "visible";
+					$("focus").innerHTML = '<img src="img/focus3.jpg"/>';
+					$("focus").style.left = 100 + 158 * menuPos + "px";
+					$("focus").style.top = 120 + "px";
+				} else if (_area == 1) {
+					if (lastArea == 0) {
+						listPos = menuPos;
+					}
+					if (lastArea == 0 && menuPos > (listProgs.length - 1)) {
+						listPos = listProgs.length - 1;
+					}
+          if (lastArea == 2){
+						if (listProgs.length == 14) {
+							if (pagePos == 0){listPos = 12;}
+							else if(pagePos == 1){listPos = 13;}
+						}else
+						listPos = listProgs.length-1;
+					}
+          clearmq(listPos);
+				  mq();
+					$("focus").innerHTML = '<img src="img/focus2.png"/>';
+					$("focus").style.visibility = "visible";
+					$("focus").style.left = 96 + 160 * (listPos % 7) + "px";
+					$("focus").style.top = 204 + 210 * Math.floor(listPos / 7) + "px";
+					$("up").style.visibility = "hidden";
+					$("down").style.visibility = "hidden";
+				} else if (_area == 2) {
+          clearmq(listPos);
+					$("focus").style.visibility = "hidden";
+					if(listPos==13) {
+						pagePos=1;
+					}else if(listPos>=0 && listPos<=12) {
+						pagePos=0;
+                    }
+                    $("down").style.visibility = ["hidden", "visible"][pagePos];
+					$("up").style.visibility = ["visible", "hidden"][pagePos];
+				} else if (_area == 3) {
+
+				    if(menuPos >= 0 || menuPos <= 5) funcPos = 0;
+				    if(menuPos == 6) funcPos = 2;
+				
+					$("focus").innerHTML = '<img src="img/focus5.jpg"/>';
+					$("focus").style.visibility = "visible";
+					$("focus").style.left = 894 + 77 * funcPos + "px";
+					$("focus").style.top = 70 + "px";
+				}
+			}
+
+			function getCaiJiData(){
+			var columnID="";
+			//var appName="";
+			var pageNum=0;
+			var serviceNum=0;
+			//var pageID="";
+			if(area == 1){
+				columnID = listProgs[listPos].folderAssetId;
+				columnName="电影/杜比影院/"+listProgs[listPos].titleBrief;
+				pageNum=parseInt(currPage+1);
+				pageID = "6.4" + "/B" + listPos + 1;
+				if(pageNum<totalPage)
+					serviceNum=14;
+				else if(pageNum=totalPage)
+					serviceNum=Math.ceil(news%itemPerPage);
+			}
+			var keyList = ["P","C","CN","PN","SN"];
+			var valueList = [pageID,columnID,columnName,pageNum,serviceNum];
+			Collect.put("0105",keyList,valueList);
+			$("popText").innerText = "assetId=" + assetId + "pageID=" + pageID + "&appName=" + appName + "&page=" + page + "&pageNum=" + pageNum;
+			$("popMsg").style.visibility = "visible";
+			msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;',5000);
+		}
+
+			function doSelect() {
+				if (area == 0) {
+					if (menuPos == 4) {
+						window.location.href = "sort.html";
+					} else if (menuPos == 6) {
+						window.location.href = "jingdian.html";
+					} else if (menuPos == 0) {
+						window.location.href = "../index.html";
+					} else if (menuPos == 1) {
+						window.location.href = "../movie_2/zuixin.html";
+					} else if (menuPos == 2) {
+						window.location.href = "../movie_2/dongzuo.html";
+					} else if (menuPos == 5) {
+						window.location.href = "dongman.html";
+					}
+				} else if (area == 2) {
+					if (pagePos == 0) changePage(-1);
+					else if (pagePos == 1) changePage(1);
+				} else if (area == 3) {
+					if (funcPos == 0) {
+                        window.location.href = "http://vod.fjgdwl.com:80/SearchNew/search_2.htm?" + "&backUrl="+returnIp+"dubi.html";
+					} else if (funcPos == 1) {
+						window.location.href = gksc_url + "bookMark.htm?"+ "&backUrl="+returnIp+"dubi.html";
+					} else if (funcPos == 2) {
+						window.location.href = gksc_url + "viewRecord.htm?"+ "&backUrl="+returnIp+"dubi.html";
+					} else if (funcPos == 3) {
+						gotoIndex();
+					}
+				} else if (area == 1) {
+					getCaiJiData();
+					window.location.href = "../" + "detailMovie.htm?serviceId=" + listServiceId + "&assetId=" + listProgs[listPos].assetId + "&chargeMode=" + listChargeMode + "&listArea=" + area + "&listCurrPage=" + currPage + "&listDataPos=" + listPos + "&backtype=" + backtype + "&listColumnName=" + columnName + "&listPageID=" + pageID;
+				}
+			}
+
+			function init() {
+				listArea = getUrlParams("listArea", window.location.href);
+				listCurrPage = getUrlParams("listCurrPage", window.location.href);
+				listDataPos = getUrlParams("listDataPos", window.location.href);
+				if (listArea != "") listArea = parseInt(listArea, 10);
+				if (listCurrPage != "") listCurrPage = parseInt(listCurrPage, 10);
+				if (listDataPos != "") listDataPos = parseInt(listDataPos, 10);
+				if (listArea == 1) {
+					currPage = listCurrPage;
+				}
+				getlistProgData();
+			}
+
+			function getlistProgData() {
+				listProgs = [];
+				clearListPrograms();
+				/*var hashTableKey = "getlistProgData_" + menuAssetIds[menuType][1] + "_" + currPage;
+				var temp = hashTableObj.get(hashTableKey);
+				if(temp != false){
+					listProgs = temp;
+					initListPrograms();
+					$("listTips").style.visibility = "hidden";
+					$("listProgArea").style.visibility = "visible";
+					$("focus").style.visibility = "visible";
+					$("pageInfo").innerHTML = '<span style="font-size:23px;color:white">'+(currPage+1)+'/'+totalPage+'</span>';
+					return;
+				}*/
+
+				if (listAjaxObj == null) {
+					listAjaxObj = new ajaxClass();
+					listAjaxObj.frame = window;
+				} else {
+					listAjaxObj.requestAbort();
+				}
+				$("loadingIcon").style.visibility = "visible";
+				$("focus").style.visibility = "hidden";
+				$("listProgArea").style.visibility = "hidden";
+				listAjaxObj.successCallback = function(_xmlHttp, _params) {
+					var data = parseDom(this.getResponseXML());
+					var jsonData = parseJson(data.toJson());
+					if (typeof(jsonData) != "object" || jsonData == null) {
+						$("listTips").innerText = "获取数据失败！";
+						$("listTips").style.visibility = "visible";
+						$("loadingIcon").style.visibility = "hidden";
+						return;
+					}
+					var key = "FolderContents";
+					if (key in jsonData) {
+						var totalResult = parseInt(jsonData.FolderContents[0].totalResults, 10);
+						listServiceId = jsonData.FolderContents[0].FolderFrame[0].serviceId;
+						listChargeMode = jsonData.FolderContents[0].FolderFrame[0].chargeMode;
+						if (totalResult > 0) {
+							var series = jsonData.FolderContents[0].ChildFolder;
+							var movies = jsonData.FolderContents[0].SelectableItem;
+							if (typeof series != "undefined") {
+								for (var i = 0; i < series.length; i++) {
+									series[i].type = "S";
+								}
+							} 
+							else series = [];
+							if (typeof movies != "undefined") {
+								for (var i = 0; i < movies.length; i++) {
+									movies[i].type = "M";
+								}
+							} 
+							else movies = [];
+							listProgs = series.concat(movies);
+							//hashTableObj.put(_params[0],listProgs);
+							totalPage = Math.ceil(totalResult / itemPerPage);
+							news = Number(totalResult);
+							$("pageInfo").innerHTML = '<span style="font-size:28px;color:black;">' + (currPage + 1) + '</span>/'+totalPage;
+							initListPrograms();
+							$("listTips").style.visibility = "hidden";
+							$("listProgArea").style.visibility = "visible";
+							if (area == 1) {
+								$("focus").style.visibility = "visible";
+							} else if (area == 2) {
+								$("focus").style.visibility = "hidden";
+							}
+							$("loadingIcon").style.visibility = "hidden";
+						} else {
+							$("listTips").innerText = "暂无数据";
+							$("listTips").style.visibility = "visible";
+							$("loadingIcon").style.visibility = "hidden";
+						}
+					} else if ("NavServerResponse" in jsonData) {
+						var message = jsonData.NavServerResponse[0].message;
+						var code = jsonData.NavServerResponse[0].code;
+						$("listTips").innerText = "发生错误！错误码：" + code + "，请咨询客服96311。";
+						$("listTips").style.visibility = "visible";
+						$("loadingIcon").style.visibility = "hidden";
+					} else {
+						$("listTips").innerText = "获取数据失败！";
+						$("listTips").style.visibility = "visible";
+						$("loadingIcon").style.visibility = "hidden";
+					}
+				};
+				listAjaxObj.failureCallback = function(_xmlHttp, _params) {
+					$("listTips").innerText = "获取数据失败！";
+					$("listTips").style.visibility = "visible";
+					$("loadingIcon").style.visibility = "hidden";
+				};
+
+				listAjaxObj.urlParameters = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?><GetFolderContents assetId='" + menuAssetIds[menuType][0] + "' portalId='1' client='" + CAManager.cardSerialNumber + "' account='" + account + "' startAt='" + (currPage * itemPerPage + 1) + "' maxItems='" + itemPerPage + "' languageCode='Zh-CN' regionCode='1' includeFolderProperties='Y' includeSubFolder='Y' includeSelectableItem='Y' profile='1.0'/>";
+				//listAjaxObj.callbackParams = [hashTableKey];
+				listAjaxObj.url = ["http://" + ip + ":" + port + "/GetFolderContents", "data/listProgData_" + menuType + "_" + (currPage + 1) + ".xml"][DEBUG];
+				listAjaxObj.requestData("POST");
+			}
+
+			function clearListPrograms() {
+				for (var i = 0; i < itemPerPage; i++) {
+					$(i).src = "img/blank.gif";
+					$("listProgName"+i).innerText = "";
+				    $("e"+i).innerText = "";
+				    $("zhezhao"+i).style.backgroundImage = "url()";
+                    $("dubi"+i).style.backgroundImage = "url()";
+				}
+			}
+
+			function initListPrograms() {
+				var srcPrefix = DEBUG == 0 ? ("http://" + ip + ":" + port + "/") : "";
+				for (var i = 0; i < itemPerPage; i++) {
+					if (i < listProgs.length) {
+						var posterUrl = "img/detailDefault_163.jpg";
+						if (typeof(listProgs[i].Image) != "undefined") {
+							for (var k = 0; k < listProgs[i].Image.length; k++) {
+								if (listProgs[i].Image[k].width == "130" && listProgs[i].Image[k].height == "175") {
+									posterUrl = srcPrefix + listProgs[i].Image[k].posterUrl;
+								}
+							}
+						}
+						$(i).src = posterUrl;
+							getStrLen(i);
+						$("zhezhao"+i).style.backgroundImage = "url(img/zhezhao.png)";
+                        $("dubi"+i).style.backgroundImage = "url(img/dubi.png)";
+						/*var nameAll = listProgs[i].type == "S" ? listProgs[i].displayName : listProgs[i].titleBrief;
+						$("listProgName" + i).innerText = getStrChineseLen(nameAll, 6);
+						$("listProgName" + i).style.backgroundImage = "url(img/zhezhao.png)";*/
+						sb = true;
+					} else {
+						$(i).src = "img/blank.gif";
+					}
+				}
+				if (area == 1 || area == 2) {
+					if (listPos > listProgs.length - 1) {
+						listPos = listProgs.length - 1;
+						$("focus").style.left = 96 + 160 * (listPos % 7) + "px";
+						$("focus").style.top = 203 + 210 * Math.floor(listPos / 7) + "px";
+					}
+					if (area == 1) {
+            clearmq(listPos);
+			      mq();
+						/*var name = listProgs[listPos].type == "S" ? listProgs[listPos].displayName : listProgs[listPos].titleBrief;
+						if (getStrChineseLength(name) > 6) {
+							$("listProgName" + listPos).innerHTML = "<marquee>" + name + "</marquee>";
+						}*/
+					}
+				}
+				if (listArea == 1) {
+					listPos = listDataPos;
+					area = listArea
+					changeArea(1);
+					listArea = "";
+				}
+			}
+
+			function changePage(_num) {
+				if (currPage == 0 && _num < 0) {
+					showPop("当前已是第一页");
+				} else if (currPage == totalPage - 1 && _num > 0) {
+					showPop("当前已是最后一页");
+				} else {
+					currPage += _num;
+					getlistProgData();
+				}
+			}
+
+			function showPop(_txt) {
+				$("popText").innerText = _txt;
+				$("popMsg").style.visibility = "visible";
+				tipShowFlag = true;
+				clearTimeout(msgTimeout);
+				msgTimeout = setTimeout('$("popMsg").style.visibility = "hidden";tipShowFlag = false;', 3000);
+			}
+
+			function exit() {
+				if (listAjaxObj != null) {
+					listAjaxObj.requestAbort();
+				}
+			}
+		</script>
+
+		<style>
+				.div {
+			height: 0px;
+			filter:alpha(opacity=100); /* IE */ 
+			-moz-opacity:1.0; /* Moz + FF */
+			opacity: 1.0; 
+			text-align:  center;
+			font-size: 20px;
+			color: white;
+			vertical-align: middle;
+			display:inline;
+		}
+		</style>
+	</head>
+
+	<body style="margin:0 0 0 0 ; background-image: url(img/bg.png);" onload="init()" onUnload="exit()">
+		<!-- 焦点 -->
+		<div id="focus" style="position:absolute;left:96px;top:204px;visibility:hidden;z-index:10;">
+			<img src="img/focus2.png" />
+		</div>
+		<!-- 焦点_蓝色 -->
+		<div style="position:absolute;left:574px;top:120px;z-index:5;">
+			<img src="img/focus4.jpg" />
+		</div>
+		<!-- 节目列表 -->
+		<div id="listProgArea" style="position:absolute;left:100px;top:208px;width:1090px;height:405px;visibility:hidden;">
+			<!-- 上7个 -->
+		<div style="position:absolute;left:0px;top:0px;width:130px;height:195px;">
+		<img id="0" src=" " width=130px height=175px />
+		 <div id="zhezhao0" style="position:absolute;left:0px;top:160px;width:130px;height:35px;" ></div>
+		 <div id="dubi0" style="position: absolute; left: 14px; top: 140px; width: 102px; height: 11px;" ></div>
+		<div id="scroll0" class="div" style="position:absolute;left:0px;top:167.5px;width:130px;height:35px;white-space: nowrap;overflow:hidden;">
+			<div id="inscroll0" style="float: left; width: 700%;position:absolute;left:5px;">
+		        <div id="listProgName0" class="div" style="float: left;"></div>
+		        <div id="e0" class="div" style="float: left;"></div>
+	      </div>
+	    </div>
+	</div>
+	<div style="position:absolute;left:160px;top:0px;width:130px;height:195px;">
+		<img id="1" src=" " width=130px height=175px />
+		<div id="zhezhao1" style="position:absolute;left:0px;top:160px;width:130px;height:35px;" ></div>
+		<div id="dubi1" style="position:absolute;left: 14px; top: 140px;width: 102px; height: 11px;" ></div>
+		<div id="scroll1" class="div" style="position:absolute;left:0px;top:167.5px;width:130px;height:35px;white-space: nowrap;overflow:hidden;">
+			<div id="inscroll1" style="float: left; width: 700%;position:absolute;left:5px;">
+		        <div id="listProgName1" class="div" style="float: left;"></div>
+		        <div id="e1" class="div" style="float: left;"></div>
+		    </div>
+	    </div>
+	</div>
+	<div style="position:absolute;left:320px;top:0px;width:130px;height:195px;">
+		<img id="2" src=" " width=130px height=175px />
+		<div id="zhezhao2" style="position:absolute;left:0px;top:160px;width:130px;height:35px;" ></div>
+		<div id="dubi2" style="position:absolute;left: 14px; top: 140px;width: 102px; height: 11px;" ></div>
+		<div id="scroll2" class="div" style="position:absolute;left:0px;top:167.5px;width:130px;height:35px;white-space: nowrap;overflow:hidden;">
+			<div id="inscroll2" style="float: left; width: 700%;position:absolute;left:5px;">
+		        <div id="listProgName2" class="div" style="float: left;"></div>
+		        <div id="e2" class="div" style="float: left;"></div>
+		    </div>
+	    </div>		
+	</div>
+	<div style="position:absolute;left:480px;top:0px;width:130px;height:195px;">
+		<img id="3" src=" " width=130px height=175px />
+		<div id="zhezhao3" style="position:absolute;left:0px;top:160px;width:130px;height:35px;" ></div>
+		<div id="dubi3" style="position:absolute;left: 14px; top: 140px;width: 102px; height: 11px;" ></div>
+		<div id="scroll3" class="div" style="position:absolute;left:0px;top:167.5px;width:130px;height:35px;white-space: nowrap;overflow:hidden;">
+			<div id="inscroll3" style="float: left; width: 700%;position:absolute;left:5px;">
+		        <div id="listProgName3" class="div" style="float: left;"></div>
+		        <div id="e3" class="div" style="float: left;"></div>
+		    </div>
+	    </div>
+	</div>
+	<div style="position:absolute;left:640px;top:0px;width:130px;height:195px;">
+		<img id="4" src=" " width=130px height=175px />
+		<div id="zhezhao4" style="position:absolute;left:0px;top:160px;width:130px;height:35px;" ></div>
+		<div id="dubi4" style="position:absolute;left: 14px; top: 140px;width: 102px; height: 11px;" ></div>
+		<div id="scroll4" class="div" style="position:absolute;left:0px;top:167.5px;width:130px;height:35px;white-space: nowrap;overflow:hidden;">
+			<div id="inscroll4" style="float: left; width: 700%;position:absolute;left:5px;">
+		        <div id="listProgName4" class="div" style="float: left;"></div>
+		        <div id="e4" class="div" style="float: left;"></div>
+		    </div>
+	    </div>
+	</div>
+	<div style="position:absolute;left:800px;top:0px;width:130px;height:195px;">
+		<img id="5" src=" " width=130px height=175px />
+		<div id="zhezhao5" style="position:absolute;left:0px;top:160px;width:130px;height:35px;" ></div>
+		<div id="dubi5" style="position:absolute;left: 14px; top: 140px;width: 102px; height: 11px;" ></div>
+		<div id="scroll5" class="div" style="position:absolute;left:0px;top:167.5px;width:130px;height:35px;white-space: nowrap;overflow:hidden;">
+			<div id="inscroll5" style="float: left; width: 700%;position:absolute;left:5px;">
+		        <div id="listProgName5" class="div" style="float: left;"></div>
+		        <div id="e5" class="div" style="float: left;"></div>
+		    </div>
+	    </div>	
+	</div>
+	<div style="position:absolute;left:960px;top:0px;width:130px;height:195px;">
+		<img id="6" src=" " width=130px height=175px />
+		<div id="zhezhao6" style="position:absolute;left:0px;top:160px;width:130px;height:35px;" ></div>
+		<div id="dubi6" style="position:absolute;left: 14px; top: 140px;width: 102px; height: 11px;" ></div>
+		<div id="scroll6" class="div" style="position:absolute;left:0px;top:167.5px;width:130px;height:35px;white-space: nowrap;overflow:hidden;">
+			<div id="inscroll6" style="float: left; width: 700%;position:absolute;left:5px;">
+		        <div id="listProgName6" class="div" style="float: left;"></div>
+		        <div id="e6" class="div" style="float: left;"></div>
+		    </div>
+	    </div>	
+	</div>
+    <!-- 下7个 -->
+	<div style="position:absolute;left:0px;top:210px;width:130px;height:195px;">
+		<img id="7" src=" " width=130px height=175px />
+		<div id="zhezhao7" style="position:absolute;left:0px;top:160px;width:130px;height:35px;" ></div>
+		<div id="dubi7" style="position:absolute;left: 14px; top: 140px;width: 102px; height: 11px;" ></div>
+		<div id="scroll7" class="div" style="position:absolute;left:0px;top:167.5px;width:130px;height:35px;white-space: nowrap;overflow:hidden;">
+			<div id="inscroll7" style="float: left; width: 700%;position:absolute;left:5px;">
+		        <div id="listProgName7" class="div" style="float: left;"></div>
+		        <div id="e7" class="div" style="float: left;"></div>
+		    </div>
+	    </div>
+	</div>
+	<div style="position:absolute;left:160px;top:210px;width:130px;height:195px;">
+		<img id="8" src=" " width=130px height=175px />
+		<div id="zhezhao8" style="position:absolute;left:0px;top:160px;width:130px;height:35px;" ></div>
+		<div id="dubi8" style="position:absolute;left: 14px; top: 140px;width: 102px; height: 11px;" ></div>
+		<div id="scroll8" class="div" style="position:absolute;left:0px;top:167.5px;width:130px;height:35px;white-space: nowrap;overflow:hidden;">
+			<div id="inscroll8" style="float: left; width: 700%;position:absolute;left:5px;">
+		        <div id="listProgName8" class="div" style="float: left;"></div>
+		        <div id="e8" class="div" style="float: left;"></div>
+		    </div>
+	    </div>
+	</div>
+	<div style="position:absolute;left:320px;top:210px;width:130px;height:195px;">
+		<img id="9" src=" " width=130px height=175px />
+		<div id="zhezhao9" style="position:absolute;left:0px;top:160px;width:130px;height:35px;" ></div>
+		<div id="dubi9" style="position:absolute;left: 14px; top: 140px;width: 102px; height: 11px;" ></div>
+		<div id="scroll9" class="div" style="position:absolute;left:0px;top:167.5px;width:130px;height:35px;white-space: nowrap;overflow:hidden;">
+			<div id="inscroll9" style="float: left; width: 700%;position:absolute;left:5px;">
+		        <div id="listProgName9" class="div" style="float: left;"></div>
+		        <div id="e9" class="div" style="float: left;"></div>
+		    </div>
+	    </div>
+	</div>
+	<div style="position:absolute;left:480px;top:210px;width:130px;height:195px;">
+		<img id="10" src=" " width=130px height=175px />
+		<div id="zhezhao10" style="position:absolute;left:0px;top:160px;width:130px;height:35px;" ></div>
+		<div id="dubi10" style="position:absolute;left: 14px; top: 140px;width: 102px; height: 11px;" ></div>
+		<div id="scroll10" class="div" style="position:absolute;left:0px;top:167.5px;width:130px;height:35px;white-space: nowrap;overflow:hidden;">
+			<div id="inscroll10" style="float: left; width: 700%;position:absolute;left:5px;">
+		        <div id="listProgName10" class="div" style="float: left;"></div>
+		        <div id="e10" class="div" style="float: left;"></div>
+		    </div>
+	    </div>
+	</div>
+	<div style="position:absolute;left:640px;top:210px;width:130px;height:195px;">
+		<img id="11" src=" " width=130px height=175px />
+		<div id="zhezhao11" style="position:absolute;left:0px;top:160px;width:130px;height:35px;" ></div>
+		<div id="dubi11" style="position:absolute;left: 14px; top: 140px;width: 102px; height: 11px;" ></div>
+		<div id="scroll11" class="div" style="position:absolute;left:0px;top:167.5px;width:130px;height:35px;white-space: nowrap;overflow:hidden;">
+			<div id="inscroll11" style="float: left; width: 700%;position:absolute;left:5px;">
+		        <div id="listProgName11" class="div" style="float: left;"></div>
+		        <div id="e11" class="div" style="float: left;"></div>
+		    </div>
+	    </div>
+	</div>
+	<div style="position:absolute;left:800px;top:210px;width:130px;height:195px;">
+		<img id="12" src=" " width=130px height=175px />
+		<div id="zhezhao12" style="position:absolute;left:0px;top:160px;width:130px;height:35px;" ></div>
+		<div id="dubi12" style="position:absolute;left: 14px; top: 140px;width: 102px; height: 11px;" ></div>
+		<div id="scroll12" class="div" style="position:absolute;left:0px;top:167.5px;width:130px;height:35px;white-space: nowrap;overflow:hidden;">
+			<div id="inscroll12" style="float: left; width: 700%;position:absolute;left:5px;">
+		        <div id="listProgName12" class="div" style="float: left;"></div>
+		        <div id="e12" class="div" style="float: left;"></div>
+		    </div>
+	    </div>	
+	</div>
+	<div style="position:absolute;left:960px;top:210px;width:130px;height:195px;">
+		<img id="13" src=" " width=130px height=175px />
+		<div id="zhezhao13" style="position:absolute;left:0px;top:160px;width:130px;height:35px;" ></div>
+		<div id="dubi13" style="position:absolute;left: 14px; top: 140px;width: 102px; height: 11px;" ></div>
+		<div id="scroll13" class="div" style="position:absolute;left:0px;top:167.5px;width:130px;height:35px;white-space: nowrap;overflow:hidden;">
+			<div id="inscroll13" style="float: left; width: 700%;position:absolute;left:5px;">
+		        <div id="listProgName13" class="div" style="float: left;"></div>
+		        <div id="e13" class="div" style="float: left;"></div>
+		    </div>
+	    </div>
+	</div>
+		</div>
+
+		<!-- 菜单按钮-->
+		<div style="position:absolute;left:100px;top:120px;width:130px;height:30px;">
+		</div>
+		<div style="position:absolute;left:258px;top:120px;width:130px;height:30px;">
+		</div>
+		<div style="position:absolute;left:416px;top:120px;width:130px;height:30px;">
+		</div>
+		<div style="position:absolute;left:574px;top:120px;width:130px;height:30px;">
+		</div>
+		<div style="position:absolute;left:732px;top:120px;width:130px;height:30px;">
+		</div>
+		<div style="position:absolute;left:890px;top:120px;width:130px;height:30px;">
+		</div>
+		<div style="position:absolute;left:1048px;top:120px;width:130px;height:30px;">
+		</div>
+
+
+		<!-- 功能键 -->
+		<div id="select" style="position:absolute;left:894px;top:70px;width:50px;height:25px;">
+		</div>
+		<div id="store" style="position:absolute;left:971px;top:70px;width:50px;height:25px;">
+		</div>
+		<div id="factory" style="position:absolute;left:1048px;top:70px;width:50px;height:25px;">
+		</div>
+		<div id="home" style="position:absolute;left:1125px;top:70px;width:50px;height:25px;">
+		</div>
+		<div id="tt" style="position:absolute;left:117px;top:70px;z-index: 10;">
+			<img src="img/title.png">
+		</div>
+		<!-- 上页、下页 -->
+		<div id="up" style="position:absolute;left:891px;top:634px;width:130px;height:30px;background-image: url(img/up_4.png);visibility:hidden;">
+		</div>
+		<div id="down" style="position:absolute;left:1050px;top:634px;width:130px;height:30px;background-image: url(img/next_4.png);visibility:hidden;">
+		</div>
+
+		<!--加载图标-->
+		<div id="loadingIcon" style="position:absolute; left:579px; top:299px; width:121px; height:121px;visibility:hidden;">
+			<img src="img/loadingIcon.gif" width="121px" height="121px" />
+		</div>
+
+		<!-- listTips -->
+		<div id="listTips" style="position:absolute; left:388px; top:261px; width:768px; height:76px;font-size:20px;visibility:hidden;">
+			正在请求数据，请稍等！
+		</div>
+
+		<!--页码-->
+		<div id="pageInfo" style="position:absolute;left:780px;top:634px;height:195px;width:67px;color:black">
+			<span style="font-size:28px">0</span>/0
+		</div>
+
+		<!--弹框-->
+		<div style="position:absolute; left:389px; top:200px; width:478px; height:285px; background-image: url(img/pop_btm0.png); background-repeat:no-repeat; text-align:center; -webkit-transition-duration:200ms; z-index:2; visibility:hidden;" id="popMsg">
+			<table width="396" height="269" border="0" cellpadding="0" cellspacing="0" style="color:#FFFFFF">
+				<tr>
+					<td height="57" colspan="3" align="center" id="hdTitle" style="font-size:32px;">温馨提示</td>
+				</tr>
+
+				<tr>
+					<td colspan="3" id="popText" align="center" style="font-size:24px; color:#caced1; line-height:45px;">正在建设，敬请关注！</td>
+				</tr>
+			</table>
+		</div>
+		
+		<div style="position:absolute; left:65px; top:640px; width:698px; height:34px; font-size:22px";>
+<marquee> 观看杜比影片，请将机顶盒音频设置为“AC3”，具体操作方法：首页按“3”—基本设置—音视频设置—音频设置“AC3”。《杜比影院》专区为单独收费专区，标准资费为10元/月，2015年12月31日前为试用体验期，暂不收费。</marquee> 	
+</div>
+
+		<!-- 断点提示框 -->
+		<div style="position:absolute; left:389px; top:200px; width:478px; height:285px; background-image: url(img/pop_btm0.png); background-repeat:no-repeat; text-align:center;-webkit-transition-duration:200ms; z-index:2; visibility:hidden;" id="playTips">
+			<table width="396" height="269" border="0" cellpadding="0" cellspacing="0" style="color:#FFFFFF">
+				<tr>
+					<td height="57" colspan="3" align="center" id="hdTitle" style="font-size:32px;">温馨提示</td>
+				</tr>
+
+				<tr>
+					<td colspan="3" id="hdContent" style="font-size:24px; color:#caced1; line-height:45px;" align="center">是否从上次断点开始播放?</td>
+				</tr>
+				<tr>
+					<td height="73" align="center" style="background:url(img/botton0_2.png) no-repeat center; color:#000; font-size:27px;" id="playBtn0">是</td>
+					<td align="center" style="background:url(img/botton0_1.png) no-repeat center; color:#000; font-size:27px;" id="playBtn1">否</td>
+				</tr>
+			</table>
+		</div>
+	</body>
+
+</html>
